@@ -2,6 +2,8 @@
 
 Automatically investigate and fix Sentry issues using Claude AI. This system fetches unresolved issues from your Sentry.io instance, analyzes them using Claude, and proposes fixes with detailed explanations.
 
+![Systems Diagram](systems-diagram.png)
+
 ## Features
 
 - **Automatic Issue Fetching**: Retrieves unresolved issues from Sentry
@@ -275,6 +277,10 @@ npm run dev
 ```
 
 ## Architecture
+
+For detailed technical architecture, see [ARCHITECTURE.md](ARCHITECTURE.md).
+
+For AI assistant context, see [CLAUDE.md](CLAUDE.md).
 
 ```
 ┌─────────────┐
