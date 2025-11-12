@@ -9,7 +9,8 @@ Automatically investigate and fix Sentry issues using Claude AI. This system fet
 - **Automatic Issue Fetching**: Retrieves unresolved issues from Sentry
 - **Intelligent Analysis**: Uses Claude to analyze stack traces and error context
 - **Fix Proposals**: Generates detailed fix proposals with code changes
-- **Sentry Integration**: Automatically comments on issues with analysis
+- **Automatic PR Creation**: Creates branches, applies fixes, and opens draft PRs (optional)
+- **Sentry Integration**: Automatically comments on issues with analysis (optional)
 - **Local Context**: Reads affected files from your codebase for better context
 - **Confidence Scoring**: Provides confidence levels for proposed fixes
 - **JSON & Markdown Output**: Saves proposals in both formats for easy review
@@ -69,10 +70,15 @@ Edit the `.env` file with your credentials:
 
 - **CODEBASE_PATH**: Path to your codebase (defaults to current directory)
 - **MAX_ISSUES_PER_RUN**: Maximum issues to process per run (default: 5)
-- **AUTO_COMMENT**: Whether to comment on Sentry issues (default: true)
+- **AUTO_COMMENT**: Whether to comment on Sentry issues (default: false)
   - Requires `project:write` scope on Sentry token
   - Set to `false` if you only want to save proposals locally
 - **OUTPUT_DIR**: Directory for saving proposals (default: ./output)
+- **AUTO_CREATE_PR**: Automatically create branches and draft PRs (default: false)
+  - Requires codebase to be a git repository
+  - Requires `gh` CLI to be installed and authenticated
+  - Creates a new branch, applies fixes, commits, and opens a draft PR
+- **BASE_BRANCH**: Base branch for PRs (default: main)
 
 ## Usage
 
@@ -108,6 +114,25 @@ Or using the compiled version:
 npm run build
 npm start
 ```
+
+### Enable Automatic PRs
+
+To enable automatic PR creation, you need:
+
+1. **Git repository**: Your codebase must be a git repository
+2. **GitHub CLI**: Install and authenticate `gh` CLI:
+   ```bash
+   brew install gh  # macOS
+   gh auth login
+   ```
+3. **Enable in config**: Set `AUTO_CREATE_PR=true` in your `.env` file
+
+When enabled, the system will:
+1. Create a new branch (`sentry-fix/ISSUE-ID-timestamp`)
+2. Apply the proposed code fixes to your files
+3. Commit the changes with a detailed message
+4. Push the branch to GitHub
+5. Create a draft pull request with full analysis
 
 ### Scheduled Execution
 

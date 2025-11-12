@@ -29,6 +29,8 @@ export function loadConfig(): OrchestratorConfig {
     maxIssuesPerRun: parseInt(process.env.MAX_ISSUES_PER_RUN || '5', 10),
     autoComment: process.env.AUTO_COMMENT !== 'false',
     outputDir: process.env.OUTPUT_DIR || './output',
+    autoCreatePR: process.env.AUTO_CREATE_PR === 'true',
+    baseBranch: process.env.BASE_BRANCH || 'main',
   };
 }
 
@@ -53,5 +55,7 @@ export function validateConfig(config: OrchestratorConfig): void {
   console.log(`   - Codebase Path: ${config.codebasePath}`);
   console.log(`   - Max Issues: ${config.maxIssuesPerRun}`);
   console.log(`   - Auto Comment: ${config.autoComment}`);
+  console.log(`   - Auto Create PR: ${config.autoCreatePR}`);
+  console.log(`   - Base Branch: ${config.baseBranch}`);
   console.log(`   - Output Dir: ${config.outputDir}`);
 }

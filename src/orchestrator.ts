@@ -1,6 +1,9 @@
 import { SentryClient } from './sentry-client.js';
 import { IssueAnalyzer } from './issue-analyzer.js';
 import { ClaudeAgent } from './claude-agent.js';
+import { GitService } from './git-service.js';
+import { GitHubService } from './github-service.js';
+import { FilePatcher } from './file-patcher.js';
 import { IssueContext, FixProposal } from './types.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -14,12 +17,17 @@ export interface OrchestratorConfig {
   maxIssuesPerRun?: number;
   autoComment?: boolean;
   outputDir?: string;
+  autoCreatePR?: boolean;
+  baseBranch?: string;
 }
 
 export class Orchestrator {
   private sentryClient: SentryClient;
   private issueAnalyzer: IssueAnalyzer;
   private claudeAgent: ClaudeAgent;
+  private gitService?: GitService;
+  private githubService?: GitHubService;
+  private filePatcher?: FilePatcher;
   private config: OrchestratorConfig;
 
   constructor(config: OrchestratorConfig) {
@@ -27,6 +35,8 @@ export class Orchestrator {
       maxIssuesPerRun: 5,
       autoComment: true,
       outputDir: './output',
+      autoCreatePR: false,
+      baseBranch: 'main',
       ...config,
     };
 
@@ -36,6 +46,45 @@ export class Orchestrator {
     );
     this.issueAnalyzer = new IssueAnalyzer(this.sentryClient);
     this.claudeAgent = new ClaudeAgent(config.anthropicApiKey);
+
+    // Initialize Git/GitHub services if auto-PR is enabled
+    if (this.config.autoCreatePR) {
+      this.initializeGitServices();
+    }
+  }
+
+  /**
+   * Initialize Git and GitHub services
+   */
+  private initializeGitServices(): void {
+    this.gitService = new GitService({
+      repoPath: this.config.codebasePath,
+      baseBranch: this.config.baseBranch,
+    });
+
+    // Check if it's a git repo
+    if (!this.gitService.isGitRepo()) {
+      console.warn('⚠️  Codebase is not a git repository. Auto-PR disabled.');
+      this.config.autoCreatePR = false;
+      return;
+    }
+
+    // Parse GitHub repo info
+    const repoInfo = this.gitService.parseGitHubRepo();
+    if (!repoInfo) {
+      console.warn('⚠️  Could not parse GitHub repository. Auto-PR disabled.');
+      this.config.autoCreatePR = false;
+      return;
+    }
+
+    this.githubService = new GitHubService({
+      owner: repoInfo.owner,
+      repo: repoInfo.repo,
+    });
+
+    this.filePatcher = new FilePatcher(this.config.codebasePath);
+
+    console.log(`✅ Auto-PR enabled for ${repoInfo.owner}/${repoInfo.repo}`);
   }
 
   /**
@@ -114,7 +163,17 @@ export class Orchestrator {
       // Step 5: Save the proposal
       await this.saveProposal(context, proposal);
 
-      // Step 6: Add comment to Sentry (if enabled)
+      // Step 6: Create PR (if enabled)
+      if (this.config.autoCreatePR && this.gitService && this.githubService && this.filePatcher) {
+        try {
+          await this.createFixPR(context, proposal);
+        } catch (error: any) {
+          console.error('⚠️  Failed to create PR:', error.message);
+          console.log('   Fix proposal saved locally for manual application');
+        }
+      }
+
+      // Step 7: Add comment to Sentry (if enabled)
       if (this.config.autoComment) {
         try {
           console.log('💬 Adding comment to Sentry...');
@@ -247,5 +306,101 @@ export class Orchestrator {
 
     await fs.writeFile(mdFilepath, markdown);
     console.log(`📄 Saved markdown to: ${mdFilepath}`);
+  }
+
+  /**
+   * Create a branch, apply fixes, commit, and create a PR
+   */
+  private async createFixPR(
+    context: IssueContext,
+    proposal: FixProposal
+  ): Promise<void> {
+    console.log('🌿 Creating fix branch and PR...');
+
+    const git = this.gitService!;
+    const github = this.githubService!;
+    const patcher = this.filePatcher!;
+
+    // Generate branch name
+    const shortId = context.issue.shortId.toLowerCase();
+    const branchName = `sentry-fix/${shortId}-${Date.now()}`;
+
+    try {
+      // Check for uncommitted changes
+      if (git.hasUncommittedChanges()) {
+        throw new Error('Repository has uncommitted changes. Please commit or stash them first.');
+      }
+
+      // Create and checkout branch
+      console.log(`  📝 Creating branch: ${branchName}`);
+      git.createBranch(branchName);
+
+      // Apply fixes to files
+      console.log('  ✏️  Applying fixes...');
+      const results = await patcher.applyFixes(proposal);
+
+      // Check if any fixes were successful
+      const successfulFixes = results.filter((r) => r.success);
+      const failedFixes = results.filter((r) => !r.success);
+
+      if (successfulFixes.length === 0) {
+        throw new Error('No fixes could be applied. All file operations failed.');
+      }
+
+      if (failedFixes.length > 0) {
+        console.warn(`  ⚠️  ${failedFixes.length} file(s) could not be modified:`);
+        for (const failed of failedFixes) {
+          console.warn(`     - ${failed.file}: ${failed.error}`);
+        }
+      }
+
+      console.log(`  ✅ Applied fixes to ${successfulFixes.length} file(s)`);
+
+      // Stage modified files
+      const modifiedFiles = successfulFixes.map((r) => r.file);
+      git.stageFiles(modifiedFiles);
+
+      // Create commit
+      const commitMessage = github.generateCommitMessage(context, proposal);
+      console.log('  💾 Creating commit...');
+      git.commit(commitMessage);
+
+      // Push branch
+      console.log('  ⬆️  Pushing branch...');
+      git.pushBranch(branchName);
+
+      // Create draft PR
+      console.log('  📬 Creating draft PR...');
+      const prTitle = github.generatePRTitle(context);
+      const prBody = github.generatePRBody(context, proposal);
+
+      const prUrl = await github.createDraftPR(
+        branchName,
+        this.config.baseBranch!,
+        prTitle,
+        prBody
+      );
+
+      console.log(`  🎉 Draft PR created: ${prUrl}`);
+
+      // Return to base branch
+      git.returnToBaseBranch();
+    } catch (error) {
+      // Try to clean up - return to base branch
+      try {
+        if (git.getCurrentBranch() !== this.config.baseBranch) {
+          git.returnToBaseBranch();
+        }
+
+        // Delete the branch if it was created
+        if (git.branchExists(branchName)) {
+          git.deleteBranch(branchName, true);
+        }
+      } catch (cleanupError) {
+        console.warn('  ⚠️  Could not clean up branch');
+      }
+
+      throw error;
+    }
   }
 }
