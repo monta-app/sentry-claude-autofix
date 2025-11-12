@@ -56,31 +56,29 @@ export class FilePatcher {
       const fileExists = await this.fileExists(fullPath);
 
       if (!fileExists) {
-        // Create new file
-        await this.ensureDirectoryExists(path.dirname(fullPath));
-        await fs.writeFile(fullPath, code, 'utf-8');
-
+        // Skip creating new files - too risky without proper path resolution
         return {
           file: filePath,
-          success: true,
-          action: 'created',
-        };
-      } else {
-        // Read existing file
-        const existingContent = await fs.readFile(fullPath, 'utf-8');
-
-        // Apply the change
-        const newContent = await this.mergeCode(existingContent, code, description);
-
-        // Write updated file
-        await fs.writeFile(fullPath, newContent, 'utf-8');
-
-        return {
-          file: filePath,
-          success: true,
-          action: 'modified',
+          success: false,
+          action: 'failed',
+          error: `File not found: ${fullPath}. Skipping to avoid creating files in wrong location.`,
         };
       }
+
+      // Read existing file
+      const existingContent = await fs.readFile(fullPath, 'utf-8');
+
+      // Apply the change
+      const newContent = await this.mergeCode(existingContent, code, description);
+
+      // Write updated file
+      await fs.writeFile(fullPath, newContent, 'utf-8');
+
+      return {
+        file: filePath,
+        success: true,
+        action: 'modified',
+      };
     } catch (error: any) {
       return {
         file: filePath,
