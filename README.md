@@ -9,7 +9,7 @@ Automatically investigate and fix Sentry issues using Claude AI. This system fet
 - **Automatic Issue Fetching**: Retrieves unresolved issues from Sentry
 - **Intelligent Analysis**: Uses Claude to analyze stack traces and error context
 - **Fix Proposals**: Generates detailed fix proposals with code changes
-- **Automatic PR Creation**: Creates branches, applies fixes, and opens draft PRs (optional)
+- **Automatic PR Creation**: Creates branches, applies fixes, and opens draft PRs (⚠️ **Experimental** - see limitations below)
 - **Sentry Integration**: Automatically comments on issues with analysis (optional)
 - **Local Context**: Reads affected files from your codebase for better context
 - **Confidence Scoring**: Provides confidence levels for proposed fixes
@@ -115,9 +115,16 @@ npm run build
 npm start
 ```
 
-### Enable Automatic PRs
+### Enable Automatic PRs (⚠️ Experimental)
 
-To enable automatic PR creation, you need:
+**⚠️ WARNING: This feature is experimental and disabled by default.**
+
+**Current Limitations:**
+- The code merging logic is simplistic and may replace entire files instead of making targeted changes
+- **NOT RECOMMENDED for production use** without careful review
+- Safe for testing only - always review generated PRs before merging
+
+If you want to experiment with automatic PR creation:
 
 1. **Git repository**: Your codebase must be a git repository
 2. **GitHub CLI**: Install and authenticate `gh` CLI:
@@ -126,13 +133,20 @@ To enable automatic PR creation, you need:
    gh auth login
    ```
 3. **Enable in config**: Set `AUTO_CREATE_PR=true` in your `.env` file
+4. **Test carefully**: Start with non-critical repositories
 
 When enabled, the system will:
 1. Create a new branch (`sentry-fix/ISSUE-ID-timestamp`)
-2. Apply the proposed code fixes to your files
+2. Attempt to apply the proposed code fixes to your files
 3. Commit the changes with a detailed message
 4. Push the branch to GitHub
 5. Create a draft pull request with full analysis
+
+**Recommended workflow instead:**
+- Keep `AUTO_CREATE_PR=false` (default)
+- Review proposals in `output/` directory
+- Manually apply fixes after review
+- Create PRs manually with your own testing
 
 ### Scheduled Execution
 
@@ -226,11 +240,35 @@ The system processes issues sequentially to avoid overwhelming the APIs.
 
 ## Limitations
 
+### Issue Filtering
+
 The system will skip issues that:
 - Have no stack trace
 - Have no in-app frames in the stack trace
 - Have more than 10,000 occurrences (likely complex issues)
 - Cannot be matched to files in the local codebase
+
+### Automatic PR Creation (Experimental)
+
+**⚠️ The auto-PR feature has significant limitations:**
+
+1. **Code Merging**: The current implementation uses simplistic code merging logic that may:
+   - Replace entire files instead of making targeted changes
+   - Lose existing code and configuration
+   - Introduce breaking changes
+
+2. **Not Production-Ready**: This feature is experimental and should only be used:
+   - In test/development environments
+   - With thorough review of every generated PR
+   - On non-critical codebases
+
+3. **Recommended Approach**:
+   - Keep `AUTO_CREATE_PR=false` (default setting)
+   - Use the JSON/Markdown proposals for manual review
+   - Apply fixes manually with proper testing
+   - Create PRs through your normal workflow
+
+The system excels at **analysis and proposal generation**, but automatic code modification needs more sophisticated diff/patch algorithms to be production-ready.
 
 ## Security
 
