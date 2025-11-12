@@ -116,9 +116,19 @@ export class Orchestrator {
 
       // Step 6: Add comment to Sentry (if enabled)
       if (this.config.autoComment) {
-        console.log('💬 Adding comment to Sentry...');
-        const comment = this.claudeAgent.generateSentryComment(proposal);
-        await this.sentryClient.addComment(issueId, comment);
+        try {
+          console.log('💬 Adding comment to Sentry...');
+          const comment = this.claudeAgent.generateSentryComment(proposal);
+          await this.sentryClient.addComment(issueId, comment);
+        } catch (error: any) {
+          if (error.response?.status === 403) {
+            console.log('⚠️  Cannot add comment - insufficient permissions');
+            console.log('   To enable comments, add "project:write" scope to your Sentry token');
+            console.log('   Or set AUTO_COMMENT=false in your .env file');
+          } else {
+            console.error('⚠️  Failed to add comment:', error.message);
+          }
+        }
       }
 
       console.log('✅ Successfully processed issue');

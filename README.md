@@ -55,6 +55,7 @@ Edit the `.env` file with your credentials:
 - **SENTRY_AUTH_TOKEN**: Your Sentry authentication token
   - Generate at: https://monta-app.sentry.io/settings/account/api/auth-tokens/
   - Required scopes: `project:read`, `event:read`, `org:read`
+  - Optional scope: `project:write` (only needed if `AUTO_COMMENT=true`)
 
 - **SENTRY_ORG_SLUG**: Your Sentry organization slug (e.g., `monta-app`)
 
@@ -69,6 +70,8 @@ Edit the `.env` file with your credentials:
 - **CODEBASE_PATH**: Path to your codebase (defaults to current directory)
 - **MAX_ISSUES_PER_RUN**: Maximum issues to process per run (default: 5)
 - **AUTO_COMMENT**: Whether to comment on Sentry issues (default: true)
+  - Requires `project:write` scope on Sentry token
+  - Set to `false` if you only want to save proposals locally
 - **OUTPUT_DIR**: Directory for saving proposals (default: ./output)
 
 ## Usage

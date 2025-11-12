@@ -54,20 +54,23 @@ Your task is to:
 3. Propose a specific fix with code changes
 4. Assess your confidence in the fix
 
-Please provide your response in the following format:
+IMPORTANT: Please provide your response in EXACTLY this format:
 
 ## Analysis
-[Your detailed analysis of the error, including root cause]
+[Your detailed analysis of the error, including root cause. Be thorough and explain the problem clearly.]
 
 ## Proposed Changes
-For each file that needs to be changed:
 
-### File: [filename]
-**Description**: [What needs to be changed and why]
+### File: [exact/path/to/file.ext]
+**Description**: [Detailed description of what needs to be changed and why. Be specific about the changes needed.]
+
 **Code**:
-\`\`\`[language]
-[The exact code change or new code to add]
+\`\`\`javascript
+// Your proposed code fix here
+// Include enough context to show what should be changed
 \`\`\`
+
+[Repeat the above pattern for each file that needs changes]
 
 ## Confidence
 [high/medium/low] - [Brief explanation of your confidence level]
@@ -126,21 +129,55 @@ ${this.formatIssueContext(issueContext)}`;
     const analysisMatch = response.match(/## Analysis\s+([\s\S]*?)(?=## Proposed Changes|$)/);
     const analysis = analysisMatch ? analysisMatch[1].trim() : response;
 
-    // Extract proposed changes
+    // Extract proposed changes section
+    const proposedChangesSection = response.match(/## Proposed Changes\s+([\s\S]*?)(?=## Confidence|$)/);
     const proposedChanges: FixProposal['proposedChanges'] = [];
-    const fileRegex = /### File: (.+?)\s+\*\*Description\*\*: (.+?)(?:\s+\*\*Code\*\*:\s+```[\w]*\s+([\s\S]*?)```)?/g;
 
-    let match;
-    while ((match = fileRegex.exec(response)) !== null) {
-      proposedChanges.push({
-        file: match[1].trim(),
-        description: match[2].trim(),
-        code: match[3] ? match[3].trim() : undefined,
-      });
+    if (proposedChangesSection) {
+      const changesText = proposedChangesSection[1];
+
+      // Split by ### File: or ### to find file sections
+      const fileSections = changesText.split(/(?=### )/);
+
+      for (const section of fileSections) {
+        if (!section.trim()) continue;
+
+        // Extract filename - try multiple patterns
+        const fileMatch = section.match(/### (?:File: )?(.+?)$/m);
+        if (!fileMatch) continue;
+
+        const filename = fileMatch[1].trim();
+
+        // Extract description - look for Description: or just text after filename
+        let description = '';
+        const descMatch = section.match(/\*\*Description\*\*:\s*(.+?)(?=\*\*Code\*\*:|```|$)/s);
+        if (descMatch) {
+          description = descMatch[1].trim();
+        } else {
+          // Try to get any text between the filename and code block
+          const textMatch = section.match(/### (?:File: )?.+?\n+(.+?)(?=```|$)/s);
+          if (textMatch) {
+            description = textMatch[1].trim();
+          }
+        }
+
+        // Extract code - look for code blocks
+        let code: string | undefined;
+        const codeMatch = section.match(/```[\w]*\n([\s\S]*?)```/);
+        if (codeMatch) {
+          code = codeMatch[1].trim();
+        }
+
+        proposedChanges.push({
+          file: filename,
+          description: description || 'See analysis above',
+          code,
+        });
+      }
     }
 
     // Extract confidence
-    const confidenceMatch = response.match(/## Confidence\s+(high|medium|low)/i);
+    const confidenceMatch = response.match(/## Confidence\s*\n*\s*(high|medium|low)/i);
     let confidence: FixProposal['confidence'] = 'medium';
     if (confidenceMatch) {
       confidence = confidenceMatch[1].toLowerCase() as FixProposal['confidence'];
