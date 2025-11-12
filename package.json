@@ -1,0 +1,28 @@
+{
+  "name": "sentry-claude-autofix",
+  "version": "1.0.0",
+  "description": "Automatically investigate and fix Sentry issues using Claude Code",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "watch": "tsc --watch",
+    "test:connection": "tsx src/test-connection.ts",
+    "list-projects": "tsx src/list-projects.ts"
+  },
+  "keywords": ["sentry", "claude", "autofix", "debugging"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
+    "axios": "^1.7.9",
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
