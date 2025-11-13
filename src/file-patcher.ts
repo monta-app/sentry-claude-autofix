@@ -134,16 +134,19 @@ export class FilePatcher {
       path.join(this.basePath, cleanPath.replace(/^src\//, '')),
     ];
 
+    // Use sync version of fs for path checking
+    const fsSync = require('fs');
+
     // Return first path that exists, or the direct join
     for (const p of possiblePaths) {
       try {
-        if (require('fs').existsSync(p)) {
+        if (fsSync.existsSync(p)) {
           return p;
         }
       } catch {}
     }
 
-    // Default to direct join
+    // Default to direct join (most common case)
     return path.join(this.basePath, cleanPath);
   }
 
